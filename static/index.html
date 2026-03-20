@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~/daily-motivation</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Theme variables ─────────────────────────────────────────────────────── */
+  :root[data-theme="dark"] {
+    --bg:         #0f0f0f;
+    --surface:    #161616;
+    --border:     #2a2a2a;
+    --border-top: #1f1f1f;
+    --muted:      #555;
+    --dim:        #888;
+    --text:       #d4d4d4;
+    --bright:     #f0f0f0;
+    --accent:     #7ee787;
+    --accent-dim: #3d7a44;
+    --prompt:     #58a6ff;
+    --yellow:     #e3b341;
+    --scanline:   rgba(0,0,0,0.03);
+    --glow:       rgba(126,231,135,0.04);
+    --dot-red:    #ff5f57;
+    --dot-yellow: #febc2e;
+    --dot-green:  #28c840;
+    --toggle-ico: "☀️";
+  }
+
+  :root[data-theme="light"] {
+    --bg:         #f5f5f0;
+    --surface:    #ffffff;
+    --border:     #d0d0c8;
+    --border-top: #e8e8e0;
+    --muted:      #999;
+    --dim:        #666;
+    --text:       #333;
+    --bright:     #111;
+    --accent:     #2d6a35;
+    --accent-dim: #7ab884;
+    --prompt:     #0969da;
+    --yellow:     #b08000;
+    --scanline:   rgba(0,0,0,0.01);
+    --glow:       rgba(45,106,53,0.03);
+    --dot-red:    #ff5f57;
+    --dot-yellow: #febc2e;
+    --dot-green:  #28c840;
+    --toggle-ico: "🌙";
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      var(--scanline) 2px, var(--scanline) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 800px; height: 500px;
+    background: radial-gradient(ellipse, var(--glow) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Theme toggle ────────────────────────────────────────────────────────── */
+  .theme-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 200;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--dim);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .theme-toggle:hover {
+    color: var(--text);
+    border-color: var(--dim);
+  }
+  .theme-toggle .ico { font-size: 0.85rem; }
+
+  /* ── Terminal window ─────────────────────────────────────────────────────── */
+  .terminal {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 680px;
+    animation: fadein 0.5s ease both;
+  }
+
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .window-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: background 0.3s ease, border-color 0.3s ease;
+  }
+
+  .dots { display: flex; gap: 7px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.red    { background: var(--dot-red); }
+  .dot.yellow { background: var(--dot-yellow); }
+  .dot.green  { background: var(--dot-green); }
+
+  .window-title {
+    flex: 1;
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    margin-right: 44px;
+  }
+
+  .window-body {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 1px solid var(--border-top);
+    border-radius: 0 0 10px 10px;
+    padding: 28px 32px 36px;
+    transition: background 0.3s ease, border-color 0.3s ease;
+  }
+
+  /* ── Prompt lines ────────────────────────────────────────────────────────── */
+  .prompt-line {
+    font-size: 0.78rem;
+    color: var(--dim);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .prompt-line.show { opacity: 1; }
+
+  .prompt-user { color: var(--accent); }
+  .prompt-sep  { color: var(--muted); }
+  .prompt-dir  { color: var(--prompt); }
+  .prompt-sym  { color: var(--muted); }
+  .prompt-cmd  { color: var(--text); }
+
+  /* ── Loading sequence ────────────────────────────────────────────────────── */
+  .loading-lines {
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .loading-lines.show { opacity: 1; }
+
+  .loading-line {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .loading-line .spinner {
+    display: inline-block;
+    animation: spin-chars 0.8s steps(4) infinite;
+    color: var(--accent);
+  }
+  @keyframes spin-chars {
+    0%   { content: "⠋"; }
+    25%  { content: "⠙"; }
+    50%  { content: "⠹"; }
+    75%  { content: "⠸"; }
+  }
+  .loading-line.done .spinner { color: var(--accent); }
+  .loading-line.done .spinner::before { content: "✓"; animation: none; }
+  .loading-line:not(.done) .spinner::before { content: "⠋"; }
+
+  /* ── Output block ────────────────────────────────────────────────────────── */
+  .output {
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  .output.show { opacity: 1; }
+
+  .output-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 18px 0;
+    transition: border-color 0.3s ease;
+  }
+
+  .reason-line {
+    font-size: 0.72rem;
+    color: var(--dim);
+    margin-bottom: 4px;
+  }
+  .reason-line .reason-text { color: var(--yellow); }
+
+  .quote-block {
+    padding: 4px 0 4px 20px;
+    border-left: 2px solid var(--accent-dim);
+    margin: 18px 0 22px;
+    transition: border-color 0.3s ease;
+  }
+
+  .quote-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 300;
+    font-size: clamp(0.92rem, 2vw, 1.1rem);
+    line-height: 1.85;
+    color: var(--bright);
+    letter-spacing: 0.02em;
+    transition: color 0.3s ease;
+  }
+  .quote-text::before { content: '"'; color: var(--accent-dim); font-weight: 500; }
+  .quote-text::after  { content: '"'; color: var(--accent-dim); font-weight: 500; }
+
+  .quote-author {
+    font-size: 0.72rem;
+    color: var(--accent);
+    margin-top: 14px;
+    letter-spacing: 0.05em;
+    transition: color 0.3s ease;
+  }
+  .quote-author::before { content: '→ '; color: var(--accent-dim); }
+
+  /* ── Meta row ────────────────────────────────────────────────────────────── */
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 24px;
+  }
+
+  .meta-item {
+    font-size: 0.68rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .meta-item .key { color: var(--dim); }
+  .meta-item .val { color: var(--yellow); }
+
+  /* ── Action buttons ──────────────────────────────────────────────────────── */
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--dim);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    text-decoration: none;
+  }
+  .btn:hover {
+    color: var(--text);
+    border-color: var(--dim);
+  }
+  .btn.copied {
+    color: var(--accent);
+    border-color: var(--accent-dim);
+  }
+
+  /* ── Footer prompt ───────────────────────────────────────────────────────── */
+  .footer-prompt {
+    margin-top: 28px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .footer-prompt.show { opacity: 1; }
+  .footer-prompt .comment { color: var(--accent-dim); }
+
+  .cursor {
+    display: inline-block;
+    width: 8px; height: 1em;
+    background: var(--accent);
+    vertical-align: text-bottom;
+    margin-left: 3px;
+    animation: blink 1.1s step-end infinite;
+    transition: background 0.3s ease;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+
+  /* ── Greeting line ───────────────────────────────────────────────────────── */
+  .greeting-line {
+    font-size: 0.75rem;
+    color: var(--dim);
+    margin-bottom: 16px;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .greeting-line.show { opacity: 1; }
+  .greeting-line .name { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- Theme toggle -->
+<button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+  <span class="ico" id="themeIco">☀️</span>
+  <span id="themeLabel">light</span>
+</button>
+
+<div class="terminal">
+  <!-- Window chrome -->
+  <div class="window-bar">
+    <div class="dots">
+      <div class="dot red"></div>
+      <div class="dot yellow"></div>
+      <div class="dot green"></div>
+    </div>
+    <div class="window-title">bash — ~/daily-motivation</div>
+  </div>
+
+  <div class="window-body">
+
+    <!-- Shell prompt -->
+    <div class="prompt-line" id="promptLine">
+      <span class="prompt-user" id="promptUser">kat</span>
+      <span class="prompt-sep">@</span>
+      <span class="prompt-dir">~/daily-motivation</span>
+      <span class="prompt-sym">$</span>
+      <span class="prompt-cmd">fetch motivation --date today</span>
+    </div>
+
+    <!-- Fake loading sequence -->
+    <div class="loading-lines" id="loadingLines">
+      <div class="loading-line" id="step1">
+        <span class="spinner"></span>
+        <span>fetching today's events...</span>
+      </div>
+      <div class="loading-line" id="step2" style="opacity:0;transition:opacity 0.3s">
+        <span class="spinner"></span>
+        <span>cross-referencing history...</span>
+      </div>
+      <div class="loading-line" id="step3" style="opacity:0;transition:opacity 0.3s">
+        <span class="spinner"></span>
+        <span>generating motivation...</span>
+      </div>
+    </div>
+
+    <!-- Greeting -->
+    <div class="greeting-line" id="greetingLine">
+      # <span id="greetingText"></span>
+    </div>
+
+    <!-- Quote output -->
+    <div class="output" id="output">
+      <div class="output-label" id="dayLabel"></div>
+      <div class="reason-line" style="margin-top:6px;">
+        # today: <span class="reason-text" id="reasonText"></span>
+      </div>
+      <hr class="divider">
+
+      <div class="quote-block">
+        <div class="quote-text" id="quoteText"></div>
+        <div class="quote-author" id="quoteAuthor"></div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="meta-row">
+        <div class="meta-item">
+          <span class="key">date:</span>
+          <span class="val" id="metaDate"></span>
+        </div>
+        <div class="meta-item">
+          <span class="key">tokens:</span>
+          <span class="val" id="metaWords"></span>
+        </div>
+        <div class="meta-item">
+          <span class="key">model:</span>
+          <span class="val" id="metaModel"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer-prompt" id="footerPrompt">
+      <span class="comment"># have a good one.</span>
+      <span class="cursor"></span>
+    </div>
+
+  </div>
+</div>
+
+<!-- Action buttons (outside terminal, right-aligned) -->
+<div class="actions" id="actions" style="opacity:0;transition:opacity 0.4s ease;width:100%;max-width:680px;justify-content:flex-end;margin-top:10px;">
+  <button class="btn" id="copyBtn">📋 copy quote</button>
+  <button class="btn" id="readmeBtn">📄 README.md</button>
+</div>
+
+<!-- README modal -->
+<div id="readmeModal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.7);backdrop-filter:blur(2px);align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:680px;animation:fadein 0.2s ease both;">
+    <div class="window-bar" style="border-radius:10px 10px 0 0;">
+      <div class="dots">
+        <div class="dot red" id="readmeClose" style="cursor:pointer;" title="close"></div>
+        <div class="dot yellow"></div>
+        <div class="dot green"></div>
+      </div>
+      <div class="window-title">README.md</div>
+    </div>
+    <div class="window-body" style="border-radius:0 0 10px 10px;max-height:70vh;overflow-y:auto;font-size:0.78rem;line-height:1.9;">
+      <div style="color:var(--accent);font-weight:500;margin-bottom:16px;"># daily-motivation</div>
+      <div style="color:var(--dim);margin-bottom:16px;">A daily motivational quote tied to today in history.<br>Powered by Flask + Anthropic API.</div>
+
+      <div style="color:var(--accent);margin-bottom:8px;">## endpoints</div>
+      <div style="color:var(--dim);display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin-bottom:20px;">
+        <span style="color:var(--yellow);">GET /</span><span>browser UI</span>
+        <span style="color:var(--yellow);">GET /api/motivation</span><span>JSON response</span>
+      </div>
+
+      <div style="color:var(--accent);margin-bottom:8px;">## name param</div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 14px;color:var(--text);white-space:pre;" id="nameExamples"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  const root = document.documentElement;
+  const themeToggle = document.getElementById('themeToggle');
+  const themeIco    = document.getElementById('themeIco');
+  const themeLabel  = document.getElementById('themeLabel');
+
+  let currentTheme = localStorage.getItem('theme') || 'dark';
+  root.setAttribute('data-theme', currentTheme);
+  updateThemeUI();
+
+  themeToggle.addEventListener('click', () => {
+    currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', currentTheme);
+    localStorage.setItem('theme', currentTheme);
+    updateThemeUI();
+  });
+
+  function updateThemeUI() {
+    if (currentTheme === 'dark') {
+      themeIco.textContent = '☀️';
+      themeLabel.textContent = 'light';
+    } else {
+      themeIco.textContent = '🌙';
+      themeLabel.textContent = 'dark';
+    }
+  }
+
+  // ── Name & greeting ────────────────────────────────────────────────────────
+  function getNameFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('name')) return params.get('name').trim();
+    return null;
+  }
+
+  function getGreeting(name) {
+    const hour = new Date().getHours(); // local time
+    let period;
+    if (hour >= 5  && hour < 12) period = 'good morning';
+    else if (hour >= 12 && hour < 17) period = 'good afternoon';
+    else if (hour >= 17 && hour < 21) period = 'good evening';
+    else period = 'good night';
+    return name ? `${period}, <span class="name">${name}</span>.` : `${period}.`;
+  }
+
+  const urlName = getNameFromURL();
+  let displayName = urlName !== null ? urlName : '';
+  let greetingHTML = getGreeting(displayName);
+
+  // Fetch default name from server config if not set via URL
+  if (urlName === null) {
+    fetch('/api/config').then(r => r.json()).then(cfg => {
+      displayName = cfg.name || '';
+      greetingHTML = getGreeting(displayName);
+      document.getElementById('promptUser').textContent =
+        displayName ? displayName.toLowerCase().replace(/\s+/g, '') : '~';
+    }).catch(() => {});
+  }
+
+  // Update prompt user
+  document.getElementById('promptUser').textContent =
+    displayName ? displayName.toLowerCase().replace(/\s+/g, '') : '~';
+
+  // ── Fake loading + real fetch ──────────────────────────────────────────────
+  const step1 = document.getElementById('step1');
+  const step2 = document.getElementById('step2');
+  const step3 = document.getElementById('step3');
+
+  function markDone(el) {
+    el.classList.add('done');
+  }
+
+  function show(el, delay = 0) {
+    setTimeout(() => {
+      if (el.style !== undefined) el.style.opacity = '1';
+      el.classList.add('show');
+    }, delay);
+  }
+
+  async function init() {
+    // Show prompt
+    show(document.getElementById('promptLine'), 200);
+
+    // Show loading sequence
+    show(document.getElementById('loadingLines'), 500);
+    show(step2, 900);
+    show(step3, 1400);
+
+    // Fetch from backend
+    let data;
+    try {
+      const res = await fetch('/api/motivation');
+      if (!res.ok) throw new Error('fetch failed');
+      data = await res.json();
+    } catch (e) {
+      // Fallback if backend unreachable
+      data = {
+        date: new Date().toISOString().split('T')[0],
+        reason: "Keep going — every day is a fresh start.",
+        quote: "The secret of getting ahead is getting started.",
+        author: "Mark Twain"
+      };
+    }
+
+    // Mark steps done
+    setTimeout(() => markDone(step1), 1800);
+    setTimeout(() => markDone(step2), 2000);
+    setTimeout(() => markDone(step3), 2200);
+
+    // Populate
+    setTimeout(() => {
+      document.getElementById('loadingLines').style.display = 'none';
+
+      // Greeting
+      document.getElementById('greetingText').innerHTML = greetingHTML;
+      show(document.getElementById('greetingLine'));
+
+      // Quote content
+      const now = new Date();
+      const start = new Date(now.getFullYear(), 0, 0);
+      const dayOfYear = Math.floor((now - start) / 86400000);
+      const daysInYear = (now.getFullYear() % 4 === 0 && (now.getFullYear() % 100 !== 0 || now.getFullYear() % 400 === 0)) ? 366 : 365;
+      document.getElementById('dayLabel').textContent = `# day ${dayOfYear} of ${daysInYear}`;
+
+      document.getElementById('reasonText').textContent = data.reason;
+      document.getElementById('quoteText').textContent  = data.quote;
+      document.getElementById('quoteAuthor').textContent = data.author;
+
+      // Meta
+      document.getElementById('metaDate').textContent =
+        new Date(data.date + 'T00:00:00').toLocaleDateString('en-AU', {
+          weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+        });
+      document.getElementById('metaWords').textContent =
+        data.tokens != null ? data.tokens + ' tokens' : '—';
+      document.getElementById('metaModel').textContent =
+        data.model ?? '—';
+      show(document.getElementById('output'));
+      show(document.getElementById('footerPrompt'), 400);
+      show(document.getElementById('actions'), 400);
+
+    }, 2400);
+  }
+
+  // ── Copy button ────────────────────────────────────────────────────────────
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    const quote  = document.getElementById('quoteText').textContent;
+    const author = document.getElementById('quoteAuthor').textContent;
+    navigator.clipboard.writeText(`"${quote}" ${author}`).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = '✓ copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = '📋 copy quote';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  });
+
+  init();
+
+  // ── README modal ───────────────────────────────────────────────────────────
+  const readmeModal = document.getElementById('readmeModal');
+
+  document.getElementById('readmeBtn').addEventListener('click', () => {
+    document.getElementById('nameExamples').textContent =
+      `${window.location.origin}          # shows default name\n${window.location.origin}?name=Sam  # custom name\n${window.location.origin}?name=     # no name`;
+    readmeModal.style.display = 'flex';
+  });
+
+  document.getElementById('readmeClose').addEventListener('click', () => {
+    readmeModal.style.display = 'none';
+  });
+
+  readmeModal.addEventListener('click', (e) => {
+    if (e.target === readmeModal) readmeModal.style.display = 'none';
+  });
+</script>
+</body>
+</html>

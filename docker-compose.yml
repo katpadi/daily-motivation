@@ -1,0 +1,17 @@
+services:
+  daily-motivation:
+    build: .
+    container_name: daily-motivation
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - SITE_URL=${SITE_URL}
+      - SITE_TITLE=${SITE_TITLE}
+      - SITE_DESC=${SITE_DESC}
+      - DEFAULT_NAME=${DEFAULT_NAME}
+    env_file:
+      - .env
