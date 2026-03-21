@@ -97,9 +97,12 @@ def fetch_quote(date_str: str) -> dict:
 
         assert "reason" in parsed and "quote" in parsed and "author" in parsed
         usage = data.get("usage", {})
-        parsed["tokens"] = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+        parsed["input_tokens"] = usage.get("input_tokens", 0)
+        parsed["output_tokens"] = usage.get("output_tokens", 0)
+        parsed["tokens"] = parsed["input_tokens"] + parsed["output_tokens"]
         parsed["model"] = data.get("model", MODEL)
-    except Exception:
+    except Exception as e:
+        import traceback; traceback.print_exc()
         parsed = random.choice(FALLBACK_QUOTES)
 
     entry = {"date": date_str, **parsed}
@@ -141,6 +144,23 @@ def api_database():
         {"date": e["date"], "quote": e["quote"], "author": e["author"], "reason": e.get("reason", "")}
         for e in entries
     ])
+
+
+@app.route("/api/usage")
+def api_usage():
+    entries = QuoteTable.all()
+    # Only count entries that have split token data (stored going forward)
+    tracked = [e for e in entries if "input_tokens" in e and "output_tokens" in e]
+    input_tokens  = sum(e["input_tokens"]  for e in tracked)
+    output_tokens = sum(e["output_tokens"] for e in tracked)
+    # Haiku pricing: $0.80/M input, $4.00/M output
+    cost = (input_tokens * 0.80 + output_tokens * 4.00) / 1_000_000
+    return jsonify({
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cost_usd": round(cost, 6),
+        "tracked_days": len(tracked),
+    })
 
 
 @app.route("/api/config")

@@ -348,6 +348,23 @@
     50%       { opacity: 0; }
   }
 
+  /* ── Usage bar ───────────────────────────────────────────────────────────── */
+  .usage-bar {
+    width: 100%;
+    max-width: 680px;
+    margin-top: 10px;
+    font-size: 0.67rem;
+    color: var(--muted);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .usage-bar.show { opacity: 1; }
+  .usage-bar .key { color: var(--dim); }
+  .usage-bar .val { color: var(--yellow); }
+
   /* ── Greeting line ───────────────────────────────────────────────────────── */
   .greeting-line {
     font-size: 0.75rem;
@@ -442,9 +459,20 @@
       </div>
     </div>
 
+    <!-- Usage row -->
+    <div class="meta-row" id="usageRow" style="opacity:0;transition:opacity 0.4s ease;margin-top:10px;">
+      <div class="meta-item">
+        <span class="key">running cost:</span>
+        <span class="val" id="usageCost">—</span>
+      </div>
+      <div class="meta-item">
+        <span class="key">total tokens used:</span>
+        <span class="val" id="usageTokens">—</span>
+      </div>
+    </div>
+
     <!-- Footer -->
     <div class="footer-prompt" id="footerPrompt">
-      <span class="comment"># have a good one.</span>
       <span class="cursor"></span>
     </div>
 
@@ -645,6 +673,16 @@
       show(document.getElementById('output'));
       show(document.getElementById('footerPrompt'), 400);
       show(document.getElementById('actions'), 400);
+
+      // Fetch usage stats
+      fetch('/api/usage').then(r => r.json()).then(u => {
+        const totalTokens = u.input_tokens + u.output_tokens;
+        document.getElementById('usageCost').textContent =
+          u.tracked_days > 0 ? '$' + u.cost_usd.toFixed(6) : '—';
+        document.getElementById('usageTokens').textContent =
+          u.tracked_days > 0 ? totalTokens.toLocaleString() + ' tokens' : '—';
+        show(document.getElementById('usageRow'));
+      }).catch(() => {});
 
     }, 2400);
   }
