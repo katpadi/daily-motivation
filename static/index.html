@@ -455,6 +455,7 @@
 <div class="actions" id="actions" style="opacity:0;transition:opacity 0.4s ease;width:100%;max-width:680px;justify-content:flex-end;margin-top:10px;">
   <button class="btn" id="copyBtn">📋 copy quote</button>
   <button class="btn" id="readmeBtn">📄 README.md</button>
+  <button class="btn" id="databaseBtn">🗂 database</button>
 </div>
 
 <!-- README modal -->
@@ -480,6 +481,25 @@
 
       <div style="color:var(--accent);margin-bottom:8px;">## name param</div>
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 14px;color:var(--text);white-space:pre;" id="nameExamples"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Database modal -->
+<div id="databaseModal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.7);backdrop-filter:blur(2px);align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:680px;animation:fadein 0.2s ease both;">
+    <div class="window-bar" style="border-radius:10px 10px 0 0;">
+      <div class="dots">
+        <div class="dot red" id="databaseClose" style="cursor:pointer;" title="close"></div>
+        <div class="dot yellow"></div>
+        <div class="dot green"></div>
+      </div>
+      <div class="window-title">psql — motivations.db</div>
+    </div>
+    <div class="window-body" style="border-radius:0 0 10px 10px;max-height:70vh;overflow-y:auto;">
+      <div id="databaseContent" style="font-size:0.74rem;line-height:1.7;font-family:'JetBrains Mono',monospace;">
+        <div style="color:var(--muted);">loading...</div>
+      </div>
     </div>
   </div>
 </div>
@@ -575,7 +595,8 @@
     // Fetch from backend
     let data;
     try {
-      const res = await fetch('/api/motivation');
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const res = await fetch(`/api/motivation?tz=${encodeURIComponent(tz)}`);
       if (!res.ok) throw new Error('fetch failed');
       data = await res.json();
     } catch (e) {
@@ -660,6 +681,122 @@
 
   readmeModal.addEventListener('click', (e) => {
     if (e.target === readmeModal) readmeModal.style.display = 'none';
+  });
+
+  // ── Database modal ─────────────────────────────────────────────────────────
+  const databaseModal  = document.getElementById('databaseModal');
+  const databaseContent = document.getElementById('databaseContent');
+  let databaseLoaded = false;
+
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const PAGE_SIZE = 10;
+  let databaseEntries = [];
+  let databasePage = 0;
+
+  function buildQuery(offset) {
+    return [
+      `<span style="color:var(--accent);">db</span><span style="color:var(--muted);">@</span><span style="color:var(--prompt);">motivations</span><span style="color:var(--muted);">=# </span><span style="color:var(--text);">SELECT date, quote, author, reason</span>`,
+      `<span style="color:var(--muted);">              -# </span><span style="color:var(--text);">FROM motivations</span>`,
+      `<span style="color:var(--muted);">              -# </span><span style="color:var(--text);">ORDER BY date DESC</span>`,
+      `<span style="color:var(--muted);">              -# </span><span style="color:var(--text);">LIMIT <span style="color:var(--yellow);">${PAGE_SIZE}</span> OFFSET <span style="color:var(--yellow);">${offset}</span>;</span>`,
+    ].map(l => `<div style="margin-bottom:2px;">${l}</div>`).join('');
+  }
+
+  function renderPage(page) {
+    databasePage = page;
+    const elapsed = (Math.random() * 9 + 1).toFixed(3);
+    const offset  = page * PAGE_SIZE;
+    const slice   = databaseEntries.slice(offset, offset + PAGE_SIZE);
+    const total   = databaseEntries.length;
+    const totalPages = Math.ceil(total / PAGE_SIZE);
+
+    // Group visible slice by year → month
+    const grouped = {};
+    for (const e of slice) {
+      const [y, m] = e.date.split('-');
+      if (!grouped[y]) grouped[y] = {};
+      if (!grouped[y][m]) grouped[y][m] = [];
+      grouped[y][m].push(e);
+    }
+
+    let rows = '';
+    for (const year of Object.keys(grouped).sort((a, b) => b - a)) {
+      for (const month of Object.keys(grouped[year]).sort((a, b) => b - a)) {
+        const monthName = MONTHS[parseInt(month, 10) - 1];
+        rows += `
+          <div style="color:var(--dim);margin:18px 0 10px;letter-spacing:0.04em;">
+            <span style="color:var(--muted);">--</span> <span style="color:var(--accent);">${year}</span> <span style="color:var(--muted);">·</span> <span style="color:var(--prompt);">${monthName}</span>
+          </div>`;
+        for (const e of grouped[year][month]) {
+          rows += `
+            <div style="margin-bottom:14px;padding:10px 12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);">
+              <div style="display:grid;grid-template-columns:52px 1fr;gap:3px 10px;align-items:baseline;">
+                <span style="color:var(--muted);font-size:0.65rem;text-align:right;">date</span>
+                <span style="color:var(--yellow);">${e.date}</span>
+                <span style="color:var(--muted);font-size:0.65rem;text-align:right;">quote</span>
+                <span style="color:var(--bright);">&ldquo;${e.quote}&rdquo;</span>
+                <span style="color:var(--muted);font-size:0.65rem;text-align:right;">author</span>
+                <span style="color:var(--accent);">→ ${e.author}</span>
+                ${e.reason ? `<span style="color:var(--muted);font-size:0.65rem;text-align:right;">reason</span><span style="color:var(--dim);">${e.reason}</span>` : ''}
+              </div>
+            </div>`;
+        }
+      }
+    }
+
+    const prevDisabled = page === 0;
+    const nextDisabled = page >= totalPages - 1;
+    const btnBase = `font-family:'JetBrains Mono',monospace;font-size:0.68rem;padding:4px 10px;border-radius:4px;border:1px solid var(--border);background:transparent;cursor:pointer;transition:all 0.2s;`;
+    const btnActive = `color:var(--text);`;
+    const btnOff    = `color:var(--border);cursor:default;`;
+
+    const pagination = totalPages <= 1 ? '' : `
+      <div style="display:flex;align-items:center;gap:12px;margin-top:14px;">
+        <button id="archPrev" style="${btnBase}${prevDisabled ? btnOff : btnActive}" ${prevDisabled ? 'disabled' : ''}>← prev</button>
+        <span style="color:var(--dim);font-size:0.68rem;">page <span style="color:var(--yellow);">${page + 1}</span> of <span style="color:var(--yellow);">${totalPages}</span></span>
+        <button id="archNext" style="${btnBase}${nextDisabled ? btnOff : btnActive}" ${nextDisabled ? 'disabled' : ''}>next →</button>
+      </div>`;
+
+    databaseContent.innerHTML = `
+      <div style="margin-bottom:16px;">${buildQuery(offset)}</div>
+      ${rows || '<div style="color:var(--muted);">(0 rows)</div>'}
+      <hr class="divider" style="margin-top:18px;">
+      <div style="color:var(--muted);margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span>(${slice.length} of ${total} row${total !== 1 ? 's' : ''})</span>
+        <span style="color:var(--border);">·</span>
+        <span style="color:var(--dim);">elapsed: ${elapsed}s</span>
+      </div>
+      ${pagination}`;
+
+    // Wire up pagination buttons after render
+    const prevBtn = document.getElementById('archPrev');
+    const nextBtn = document.getElementById('archNext');
+    if (prevBtn) prevBtn.addEventListener('click', () => {
+      databaseContent.scrollTop = 0;
+      renderPage(databasePage - 1);
+    });
+    if (nextBtn) nextBtn.addEventListener('click', () => {
+      databaseContent.scrollTop = 0;
+      renderPage(databasePage + 1);
+    });
+  }
+
+  document.getElementById('databaseBtn').addEventListener('click', () => {
+    databaseModal.style.display = 'flex';
+    if (databaseLoaded) return;
+    databaseContent.innerHTML = '<div style="color:var(--muted);">executing query...</div>';
+    fetch('/api/database')
+      .then(r => r.json())
+      .then(data => { databaseLoaded = true; databaseEntries = data; renderPage(0); })
+      .catch(() => { databaseContent.innerHTML = '<div style="color:var(--muted);">ERROR: could not connect to motivations.db</div>'; });
+  });
+
+  document.getElementById('databaseClose').addEventListener('click', () => {
+    databaseModal.style.display = 'none';
+  });
+
+  databaseModal.addEventListener('click', (e) => {
+    if (e.target === databaseModal) databaseModal.style.display = 'none';
   });
 </script>
 </body>

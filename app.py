@@ -4,7 +4,8 @@ import json
 import random
 import httpx
 from datetime import datetime, timezone, timedelta
-from flask import Flask, jsonify, send_from_directory
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from flask import Flask, jsonify, send_from_directory, request
 from tinydb import TinyDB, Query
 from dotenv import load_dotenv
 
@@ -38,29 +39,35 @@ FALLBACK_QUOTES = [
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-def today_str() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+def resolve_zone(tz: str):
+    try:
+        return ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, Exception):
+        return timezone.utc
 
 
+def today_str(tz: str = "UTC") -> str:
+    return datetime.now(resolve_zone(tz)).strftime("%Y-%m-%d")
 
-def seconds_until_midnight() -> int:
-    now = datetime.now(timezone.utc)
+
+def seconds_until_midnight(tz: str = "UTC") -> int:
+    zone = resolve_zone(tz)
+    now = datetime.now(zone)
     midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     return int((midnight - now).total_seconds())
 
 
-def fetch_quote() -> dict:
-    """Return cached quote for today, or fetch from Anthropic and cache it."""
-    date_str = today_str()
+def fetch_quote(date_str: str) -> dict:
+    """Return cached quote for the given date, or fetch from Anthropic and cache it."""
     rows = QuoteTable.search(Q.date == date_str)
     if rows:
         return rows[0]
 
     prompt = (
         f"Today is {date_str}. "
-        "Identify one notable historical, scientific, cultural, or holiday event for this date. "
+        "Identify one notable event for this date, prioritizing in this order: technological, scientific, holiday, cultural, and historical. Prioritize events that are widely known and celebrated by many people. "
         "Then provide one short motivational quote (under 40 words) that fits the theme of that event. "
-        "The quote must be safe, positive, and non-controversial. "
+        "The quote must be positive and uplifting."
         "Respond ONLY with valid JSON, no markdown, no explanation. "
         'Format: {"reason": "...", "quote": "...", "author": "..."}'
     )
@@ -108,7 +115,9 @@ def index():
 @app.route("/api/motivation")
 def api_motivation():
     """JSON endpoint for the browser."""
-    entry = fetch_quote()
+    tz = request.args.get("tz", "UTC")
+    date_str = today_str(tz)
+    entry = fetch_quote(date_str)
     resp = jsonify({
         "date": entry["date"],
         "reason": entry["reason"],
@@ -117,9 +126,20 @@ def api_motivation():
         "tokens": entry.get("tokens"),
         "model": entry.get("model"),
     })
-    resp.headers["Cache-Control"] = f"public, max-age={seconds_until_midnight()}"
+    resp.headers["Cache-Control"] = f"public, max-age={seconds_until_midnight(tz)}"
     return resp
 
+
+
+@app.route("/api/database")
+def api_database():
+    """Return all cached quotes sorted by date descending."""
+    entries = QuoteTable.all()
+    entries.sort(key=lambda x: x.get("date", ""), reverse=True)
+    return jsonify([
+        {"date": e["date"], "quote": e["quote"], "author": e["author"], "reason": e.get("reason", "")}
+        for e in entries
+    ])
 
 
 @app.route("/api/config")
