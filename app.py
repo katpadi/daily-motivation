@@ -92,6 +92,7 @@ def fetch_quote(date_str: str) -> dict:
             if raw.startswith("```"):
                 raw = re.sub(r"^```[^\n]*\n?", "", raw)
                 raw = re.sub(r"```$", "", raw).strip()
+            raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw)
             parsed = json.loads(raw)
 
         assert "reason" in parsed and "quote" in parsed and "author" in parsed
