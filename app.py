@@ -141,7 +141,7 @@ def api_database():
     entries = QuoteTable.all()
     entries.sort(key=lambda x: x.get("date", ""), reverse=True)
     return jsonify([
-        {"date": e["date"], "quote": e["quote"], "author": e["author"], "reason": e.get("reason", "")}
+        {"date": e.get("date", ""), "quote": e.get("quote", ""), "author": e.get("author", ""), "reason": e.get("reason", "")}
         for e in entries
     ])
 

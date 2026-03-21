@@ -454,8 +454,8 @@
     if (databaseLoaded) return;
     databaseContent.innerHTML = '<div style="color:var(--muted);">executing query...</div>';
     fetch('/api/database')
-      .then(r => r.json())
-      .then(data => { databaseLoaded = true; databaseEntries = data; renderPage(0); })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => { databaseEntries = data; renderPage(0); databaseLoaded = true; })
       .catch(() => { databaseContent.innerHTML = '<div style="color:var(--muted);">ERROR: could not connect to motivations.db</div>'; });
   });
 
