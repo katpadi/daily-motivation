@@ -65,9 +65,11 @@ def fetch_quote(date_str: str) -> dict:
 
     prompt = (
         f"Today is {date_str}. "
-        "Identify one notable event for this date, prioritizing in this order: technological, scientific, holiday, cultural, and historical. Prioritize events that are widely known and celebrated by many people. "
-        "Then provide one short motivational quote (under 40 words) that fits the theme of that event. "
-        "The quote must be positive and uplifting."
+        "Identify one notable event for this exact date in history. "
+        "Choose from these categories: Science, Technology, Business & Innovation, Music, Pop Culture, Internet & Digital Culture, Space & Exploration, or Cultural History. "
+        "Pick a high-impact, widely recognized event — avoid obscure or trivial ones. If no strong event exists in one category, try another. "
+        "In 'reason', give a 2-sentence explanation of the event. "
+        "Then provide a motivational quote under 25 words, grounded in that specific event — avoid generic or cliché quotes. The quote must be positive and uplifting. "
         "Respond ONLY with valid JSON, no markdown, no explanation. "
         'Format: {"reason": "...", "quote": "...", "author": "..."}'
     )
