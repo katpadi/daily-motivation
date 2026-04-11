@@ -33,6 +33,7 @@ def build_prompt(date_str: str) -> str:
         "Identify one notable event for this exact date in history. "
         "Choose from these categories: Science, Technology, Business & Innovation, Music, Pop Culture, Internet & Digital Culture, Space & Exploration, or Cultural History. "
         "Pick a high-impact, widely recognized event — avoid obscure or trivial ones. If no strong event exists in one category, try another. "
+        "Ensure category diversity. Prefer a category not used recently. Only choose the most dominant event if it is significantly more impactful than alternatives."
         "In 'reason', give a 2-sentence explanation of the event. "
         "Then provide a motivational quote under 25 words, grounded in that specific event — avoid generic or cliché quotes. The quote must be positive and uplifting. "
         "Respond ONLY with valid JSON, no markdown, no explanation. "
